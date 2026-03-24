@@ -1,5 +1,6 @@
 import SwiftUI
 import CoreLocation
+import UIKit
 
 struct SetupView: View {
     @EnvironmentObject private var appState: AppState
@@ -37,34 +38,59 @@ struct SetupView: View {
                     }
 
                     VStack(spacing: 10) {
-                        Text("Welcome to Alibye")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
+                        Text("Location Access Required")
+                            .font(.system(size: 22, weight: .bold, design: .rounded))
                             .multilineTextAlignment(.center)
 
-                        Text("To build your private timeline and route history, Alibye needs access to your location.")
-                            .font(.system(size: 17))
+                        Text("Alibye needs background location access to build your private timeline and route history.")
+                            .font(.system(size: 14))
                             .multilineTextAlignment(.center)
                             .foregroundStyle(.secondary)
                             .padding(.horizontal, 10)
+
+                        Text("To continue, set Location Access to Always.")
+                            .font(.system(size: 13, weight: .semibold))
+                            .multilineTextAlignment(.center)
+                            .foregroundStyle(.blue)
                     }
 
                     VStack(spacing: 14) {
                         SetupFeatureRow(
-                            icon: "clock.arrow.circlepath",
-                            title: "Daily timeline",
-                            subtitle: "Track your visits and movement throughout the day."
+                            icon: "1.circle.fill",
+                            title: "Open Settings",
+                            subtitle: "We’ll take you to the Alibye settings page."
                         )
 
                         SetupFeatureRow(
-                            icon: "map.fill",
-                            title: "Live route history",
-                            subtitle: "See your paths on the map as you move."
+                            icon: "2.circle.fill",
+                            title: "Tap Location",
+                            subtitle: "Open the Location permission section."
                         )
 
                         SetupFeatureRow(
-                            icon: "lock.shield.fill",
-                            title: "Private by design",
-                            subtitle: "Your data stays on your device unless you choose otherwise later."
+                            icon: "3.circle.fill",
+                            title: "Choose Always",
+                            subtitle: "This is required for full tracking to work."
+                        )
+                    }
+
+                    if locationService.authorizationStatus == .authorizedWhenInUse {
+                        statusCard(
+                            title: "Current access: While Using",
+                            message: "Alibye cannot continue until you change this to Always in Settings.",
+                            color: .orange
+                        )
+                    } else if locationService.authorizationStatus == .denied || locationService.authorizationStatus == .restricted {
+                        statusCard(
+                            title: "Location access is off",
+                            message: "Open Settings and set Location to Always.",
+                            color: .red
+                        )
+                    } else if locationService.authorizationStatus == .authorizedAlways {
+                        statusCard(
+                            title: "You're all set",
+                            message: "Always access is enabled. Continue to open Alibye.",
+                            color: .green
                         )
                     }
                 }
@@ -78,14 +104,14 @@ struct SetupView: View {
 
                 VStack(spacing: 14) {
                     Button {
-                        requestLocationAccess()
+                        primaryAction()
                     } label: {
                         HStack {
                             if isRequesting {
                                 ProgressView()
                                     .tint(.white)
                             } else {
-                                Image(systemName: "location.fill")
+                                Image(systemName: buttonIcon)
                             }
 
                             Text(buttonTitle)
@@ -110,13 +136,13 @@ struct SetupView: View {
             }
         }
         .onAppear {
-            if locationService.authorizationStatus == .authorizedAlways || locationService.authorizationStatus == .authorizedWhenInUse {
+            if locationService.authorizationStatus == .authorizedAlways {
                 appState.completeSetup()
             }
         }
         .onChange(of: locationService.authorizationStatus) { _, newValue in
-            if newValue == .authorizedAlways || newValue == .authorizedWhenInUse {
-                isRequesting = false
+            isRequesting = false
+            if newValue == .authorizedAlways {
                 appState.completeSetup()
             }
         }
@@ -124,34 +150,67 @@ struct SetupView: View {
 
     private var buttonTitle: String {
         switch locationService.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
+        case .authorizedAlways:
             return "Continue"
-        case .denied, .restricted:
-            return "Open Settings"
         case .notDetermined:
             return "Allow Location Access"
+        case .authorizedWhenInUse, .denied, .restricted:
+            return "Open Settings"
         @unknown default:
-            return "Continue"
+            return "Open Settings"
         }
     }
 
-    private func requestLocationAccess() {
+    private var buttonIcon: String {
         switch locationService.authorizationStatus {
-        case .authorizedAlways, .authorizedWhenInUse:
-            appState.completeSetup()
+        case .authorizedAlways:
+            return "checkmark.circle.fill"
+        case .notDetermined:
+            return "location.fill"
+        case .authorizedWhenInUse, .denied, .restricted:
+            return "gearshape.fill"
+        @unknown default:
+            return "gearshape.fill"
+        }
+    }
 
-        case .denied, .restricted:
-            if let url = URL(string: UIApplication.openSettingsURLString) {
-                UIApplication.shared.open(url)
-            }
+    private func primaryAction() {
+        switch locationService.authorizationStatus {
+        case .authorizedAlways:
+            appState.completeSetup()
 
         case .notDetermined:
             isRequesting = true
             locationService.requestPermissions()
 
+        case .authorizedWhenInUse, .denied, .restricted:
+            openSettings()
+
         @unknown default:
-            locationService.requestPermissions()
+            openSettings()
         }
+    }
+
+    private func openSettings() {
+        guard let url = URL(string: UIApplication.openSettingsURLString) else { return }
+        UIApplication.shared.open(url)
+    }
+
+    @ViewBuilder
+    private func statusCard(title: String, message: String, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(color)
+
+            Text(message)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(14)
+        .background(color.opacity(0.08))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 
