@@ -11,13 +11,13 @@ struct TimelineScreen: View {
         NavigationView {
             ScrollView {
                 VStack(spacing: 14) {
-                    DatePicker(
-                        "Day",
-                        selection: $historyStore.selectedDate,
-                        displayedComponents: .date
-                    )
-                    .datePickerStyle(.compact)
-                    .padding(.horizontal)
+ //                   DatePicker(
+ //                       "Day",
+ //                       selection: $historyStore.selectedDate,
+ //                       displayedComponents: .date
+ //                   )
+ //                   .datePickerStyle(.compact)
+ //                   .padding(.horizontal)
 
                     if visits.isEmpty {
                         VStack(spacing: 10) {
@@ -30,7 +30,7 @@ struct TimelineScreen: View {
                                 .foregroundStyle(.secondary)
                                 .multilineTextAlignment(.center)
                         }
-                        .frame(maxWidth: .infinity)
+                        .frame(maxWidth: .infinity,  maxHeight: .infinity)
                         .padding(30)
                     } else {
                         ForEach(visits) { visit in
@@ -50,7 +50,6 @@ struct TimelineScreen: View {
                 .padding(.vertical)
             }
             .background(Color(.systemGroupedBackground))
-            .navigationTitle(AppFormatters.dayLabel.string(from: historyStore.selectedDate))
         }
     }
 }
