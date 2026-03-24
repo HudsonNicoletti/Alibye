@@ -1,20 +1,31 @@
 import SwiftUI
-import MapKit
 
 struct MapScreen: View {
     @EnvironmentObject var locationService: LocationService
+    @EnvironmentObject var historyStore: HistoryStore
 
     var body: some View {
-        let center = locationService.route.last ?? CLLocationCoordinate2D(latitude: 37.3349, longitude: -122.0090)
+        NavigationView {
+            VStack(spacing: 12) {
+                DatePicker(
+                    "Day",
+                    selection: $historyStore.selectedDate,
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.compact)
+                .padding(.horizontal)
 
-        Map(initialPosition: .region(MKCoordinateRegion(
-            center: center,
-            span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
-        ))) {
-            UserAnnotation()
-            if locationService.route.count > 1 {
-                MapPolyline(coordinates: locationService.route)
-                    .stroke(.blue, lineWidth: 4)
+                RouteMapView(
+                    coordinates: historyStore.samples(for: historyStore.selectedDate).map(\.coordinate),
+                    visitCoordinates: historyStore.visits(for: historyStore.selectedDate).map(\.coordinate)
+                )
+            }
+            .navigationTitle("Map")
+            .onAppear {
+                locationService.reloadRoute(for: historyStore.selectedDate)
+            }
+            .onChange(of: historyStore.selectedDate) { _, newValue in
+                locationService.reloadRoute(for: newValue)
             }
         }
     }
