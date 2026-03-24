@@ -10,9 +10,22 @@
 		81922C712F72F9960078C1A4 /* Alibye.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Alibye.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		81A8CE942F7300EA0025BBA1 /* Exceptions for "Alibye" folder in "Alibye" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = 81922C702F72F9960078C1A4 /* Alibye */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		81922C732F72F9960078C1A4 /* Alibye */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				81A8CE942F7300EA0025BBA1 /* Exceptions for "Alibye" folder in "Alibye" target */,
+			);
 			path = Alibye;
 			sourceTree = "<group>";
 		};
@@ -256,6 +269,9 @@
 				DEVELOPMENT_TEAM = 3NL5S2665N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Alibye/Info.plist;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We track your location in background for accurate logs.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We track your location to build your timeline.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -288,6 +304,9 @@
 				DEVELOPMENT_TEAM = 3NL5S2665N;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Alibye/Info.plist;
+				INFOPLIST_KEY_NSLocationAlwaysAndWhenInUseUsageDescription = "We track your location in background for accurate logs.";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "We track your location to build your timeline.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
