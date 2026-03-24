@@ -7,6 +7,7 @@ struct MapScreen: View {
 
     @State private var refreshToken = UUID()
     @State private var showHeatmap = false
+    @State private var showSavedLocations = false
 
     private var samples: [LocationSample] {
         historyStore.samples(for: historyStore.selectedDate)
@@ -31,17 +32,31 @@ struct MapScreen: View {
                 HStack {
                     Spacer()
 
-                    Button {
-                        showHeatmap.toggle()
-                        refreshToken = UUID()
-                    } label: {
-                        Image(systemName: showHeatmap ? "flame.fill" : "flame")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundStyle(showHeatmap ? .orange : .primary)
-                            .frame(width: 42, height: 42)
-                            .background(.ultraThinMaterial)
-                            .clipShape(Circle())
-                            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                    VStack(spacing: 10) {
+                        Button {
+                            showHeatmap.toggle()
+                            refreshToken = UUID()
+                        } label: {
+                            Image(systemName: showHeatmap ? "flame.fill" : "flame")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(showHeatmap ? .orange : .primary)
+                                .frame(width: 42, height: 42)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                        }
+
+                        Button {
+                            showSavedLocations = true
+                        } label: {
+                            Image(systemName: "house.fill")
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.primary)
+                                .frame(width: 42, height: 42)
+                                .background(.ultraThinMaterial)
+                                .clipShape(Circle())
+                                .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                        }
                     }
                     .padding(.top, 8)
                     .padding(.trailing, 16)
@@ -54,6 +69,9 @@ struct MapScreen: View {
             .padding(.bottom, 12)
         }
         .navigationBarHidden(true)
+        .sheet(isPresented: $showSavedLocations) {
+            SettingsScreen()
+        }
         .onAppear {
             locationService.reloadRoute(for: historyStore.selectedDate)
         }

@@ -29,6 +29,7 @@ final class LocationService: NSObject, ObservableObject {
         manager.requestAlwaysAuthorization()
         manager.startUpdatingLocation()
         reloadRoute(for: store.selectedDate)
+        _ = SmartPlaceStore.shared
     }
 
     func reloadRoute(for date: Date) {
@@ -63,32 +64,31 @@ final class LocationService: NSObject, ObservableObject {
         if let event = visitDetector.process(location) {
             switch event {
             case .arrived(let visit):
-                activeVisit = visit
-                store?.upsertVisit(visit, on: visit.arrival)
-                Task { await refreshPlaceName(for: visit) }
+                let labeled = labeledVisit(from: visit)
+                activeVisit = labeled
+                store?.upsertVisit(labeled, on: labeled.arrival)
+                SmartPlaceStore.shared.recordVisit(at: labeled.coordinate, arrival: labeled.arrival, departure: labeled.departure)
 
             case .updated(let visit):
-                activeVisit = visit
-                store?.upsertVisit(visit, on: visit.arrival)
-                if visit.title == "Visited Place" {
-                    Task { await refreshPlaceName(for: visit) }
-                }
+                let labeled = labeledVisit(from: visit)
+                activeVisit = labeled
+                store?.upsertVisit(labeled, on: labeled.arrival)
 
             case .departed(let visit):
+                let labeled = labeledVisit(from: visit)
                 activeVisit = nil
-                store?.upsertVisit(visit, on: visit.arrival)
-                if visit.title == "Visited Place" {
-                    Task { await refreshPlaceName(for: visit) }
-                }
+                store?.upsertVisit(labeled, on: labeled.arrival)
+                SmartPlaceStore.shared.recordVisit(at: labeled.coordinate, arrival: labeled.arrival, departure: labeled.departure)
             }
         }
     }
 
-    private func refreshPlaceName(for visit: VisitRecord) async {
-        let name = await PlaceResolver.shared.name(for: visit.coordinate)
+    private func labeledVisit(from visit: VisitRecord) -> VisitRecord {
         var updated = visit
-        updated.title = name
-        store?.upsertVisit(updated, on: updated.arrival)
+        if let smartName = SmartPlaceStore.shared.label(for: visit.coordinate) {
+            updated.title = smartName
+        }
+        return updated
     }
 }
 

@@ -62,17 +62,17 @@ struct VisitCardView: View {
         HStack(alignment: .top, spacing: 12) {
             VStack(spacing: 0) {
                 Circle()
-                    .fill(Color.blue)
+                    .fill(iconColor)
                     .frame(width: 12, height: 12)
                 Rectangle()
-                    .fill(Color.blue.opacity(0.25))
+                    .fill(iconColor.opacity(0.25))
                     .frame(width: 2)
             }
             .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text(visit.title)
+                    Label(visit.title, systemImage: iconName)
                         .font(.headline)
                         .foregroundStyle(.primary)
                     Spacer()
@@ -104,5 +104,21 @@ struct VisitCardView: View {
         .background(.background)
         .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
+    }
+
+    private var iconName: String {
+        switch visit.title.lowercased() {
+        case "home": return "house.fill"
+        case "work": return "briefcase.fill"
+        default: return "mappin.and.ellipse"
+        }
+    }
+
+    private var iconColor: Color {
+        switch visit.title.lowercased() {
+        case "home": return .green
+        case "work": return .orange
+        default: return .blue
+        }
     }
 }
