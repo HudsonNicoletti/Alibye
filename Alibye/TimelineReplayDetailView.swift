@@ -23,14 +23,31 @@ struct TimelineReplayDetailView: View {
 
     private var displayedCoordinates: [CLLocationCoordinate2D] {
         guard !replaySamples.isEmpty else { return [] }
-        let count = min(max(Int(sliderValue), 0), replaySamples.count)
+        let count = min(max(Int(sliderValue.rounded(.down)), 0), replaySamples.count)
         return Array(replaySamples.prefix(count)).map(\.coordinate)
     }
 
     private var currentMovingCoordinate: CLLocationCoordinate2D? {
         guard !replaySamples.isEmpty else { return nil }
-        let count = min(max(Int(sliderValue), 1), replaySamples.count)
-        return replaySamples[count - 1].coordinate
+        guard replaySamples.count > 1 else { return replaySamples.first?.coordinate }
+
+        let clamped = min(max(sliderValue, 1), Double(replaySamples.count))
+        let lowerIndex = max(0, min(Int(floor(clamped)) - 1, replaySamples.count - 1))
+        let upperIndex = min(lowerIndex + 1, replaySamples.count - 1)
+
+        let start = replaySamples[lowerIndex].coordinate
+        let end = replaySamples[upperIndex].coordinate
+
+        if lowerIndex == upperIndex {
+            return start
+        }
+
+        let t = clamped - floor(clamped)
+
+        return CLLocationCoordinate2D(
+            latitude: start.latitude + (end.latitude - start.latitude) * t,
+            longitude: start.longitude + (end.longitude - start.longitude) * t
+        )
     }
 
     var body: some View {
@@ -39,7 +56,8 @@ struct TimelineReplayDetailView: View {
                 coordinates: displayedCoordinates,
                 visitCoordinates: [selectedVisit.coordinate],
                 refreshToken: refreshToken,
-                movingCoordinate: currentMovingCoordinate
+                movingCoordinate: currentMovingCoordinate,
+                heatmapCoordinates: []
             )
             .ignoresSafeArea(edges: .top)
 
@@ -65,7 +83,7 @@ struct TimelineReplayDetailView: View {
                     Slider(
                         value: $sliderValue,
                         in: 0...Double(max(replaySamples.count, 1)),
-                        step: 1
+                        step: 0.05
                     )
                     .onChange(of: sliderValue) { _, _ in
                         refreshToken = UUID()
@@ -79,7 +97,7 @@ struct TimelineReplayDetailView: View {
 
                         Spacer()
 
-                        Text("\(Int(sliderValue))/\(replaySamples.count)")
+                        Text("\(Int(sliderValue.rounded(.down)))/\(replaySamples.count)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -119,11 +137,11 @@ struct TimelineReplayDetailView: View {
         refreshToken = UUID()
 
         Task {
-            for index in 1...replaySamples.count {
-                if !isPlaying { break }
-                try? await Task.sleep(for: .milliseconds(220))
+            let target = Double(replaySamples.count)
+            while isPlaying && sliderValue < target {
+                try? await Task.sleep(for: .milliseconds(28))
                 await MainActor.run {
-                    sliderValue = Double(index)
+                    sliderValue = min(sliderValue + 0.12, target)
                     refreshToken = UUID()
                 }
             }

@@ -5,7 +5,7 @@ struct MainTabView: View {
         TabView {
             MapScreen()
                 .tabItem {
-                    Label("Map", systemImage: "map")
+                    Label("Live", systemImage: "location.fill")
                 }
 
             TimelineScreen()

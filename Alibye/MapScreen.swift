@@ -6,6 +6,7 @@ struct MapScreen: View {
     @EnvironmentObject var historyStore: HistoryStore
 
     @State private var refreshToken = UUID()
+    @State private var showHeatmap = false
 
     private var samples: [LocationSample] {
         historyStore.samples(for: historyStore.selectedDate)
@@ -20,18 +21,37 @@ struct MapScreen: View {
             RouteMapView(
                 coordinates: samples.map(\.coordinate),
                 visitCoordinates: visits.map(\.coordinate),
-                refreshToken: refreshToken
+                refreshToken: refreshToken,
+                movingCoordinate: nil,
+                heatmapCoordinates: showHeatmap ? samples.map(\.coordinate) : []
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                topOverlay
+            VStack {
+                HStack {
+                    Spacer()
+
+                    Button {
+                        showHeatmap.toggle()
+                        refreshToken = UUID()
+                    } label: {
+                        Image(systemName: showHeatmap ? "flame.fill" : "flame")
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundStyle(showHeatmap ? .orange : .primary)
+                            .frame(width: 42, height: 42)
+                            .background(.ultraThinMaterial)
+                            .clipShape(Circle())
+                            .shadow(color: .black.opacity(0.12), radius: 8, x: 0, y: 4)
+                    }
+                    .padding(.top, 8)
+                    .padding(.trailing, 16)
+                }
+
                 Spacer()
+
                 bottomOverlay
             }
-            .padding(.top, 8)
             .padding(.bottom, 12)
-            .padding(.horizontal, 16)
         }
         .navigationBarHidden(true)
         .onAppear {
@@ -41,58 +61,6 @@ struct MapScreen: View {
             locationService.reloadRoute(for: newValue)
             refreshToken = UUID()
         }
-    }
-
-    private var topOverlay: some View {
-        VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Alibye")
-                        .font(.headline)
-                    Text(historyStore.selectedDate.formatted(date: .abbreviated, time: .omitted))
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                Button {
-                    historyStore.selectedDate = .now
-                    locationService.reloadRoute(for: .now)
-                    refreshToken = UUID()
-                } label: {
-                    Image(systemName: "calendar.badge.clock")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 42, height: 42)
-                }
-                .buttonStyle(MapCircleButtonStyle())
-
-                Button {
-                    refreshToken = UUID()
-                } label: {
-                    Image(systemName: "location.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 42, height: 42)
-                }
-                .buttonStyle(MapCircleButtonStyle())
-            }
-
-            HStack {
-                DatePicker(
-                    "",
-                    selection: $historyStore.selectedDate,
-                    displayedComponents: .date
-                )
-                .labelsHidden()
-                .datePickerStyle(.compact)
-                .tint(.primary)
-                Spacer()
-            }
-        }
-        .padding(14)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
     }
 
     private var bottomOverlay: some View {
@@ -120,6 +88,7 @@ struct MapScreen: View {
         .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+        .padding(.horizontal, 16)
     }
 
     private func summaryPill(title: String, value: String) -> some View {
@@ -162,15 +131,5 @@ struct MapScreen: View {
         } else {
             return String(format: "%.0f m", total)
         }
-    }
-}
-
-private struct MapCircleButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .background(.ultraThinMaterial)
-            .clipShape(Circle())
-            .scaleEffect(configuration.isPressed ? 0.96 : 1.0)
-            .animation(.easeOut(duration: 0.15), value: configuration.isPressed)
     }
 }
