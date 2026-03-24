@@ -13,6 +13,7 @@ final class LocationService: NSObject, ObservableObject {
 
     @Published var route: [CLLocationCoordinate2D] = []
     @Published var activeVisit: VisitRecord?
+    @Published var authorizationStatus: CLAuthorizationStatus = .notDetermined
 
     private override init() {
         super.init()
@@ -22,14 +23,22 @@ final class LocationService: NSObject, ObservableObject {
         manager.activityType = .fitness
         manager.allowsBackgroundLocationUpdates = true
         manager.pausesLocationUpdatesAutomatically = false
+        authorizationStatus = manager.authorizationStatus
     }
 
     func bootstrap(store: HistoryStore) async {
         self.store = store
-        manager.requestAlwaysAuthorization()
-        manager.startUpdatingLocation()
+        authorizationStatus = manager.authorizationStatus
         reloadRoute(for: store.selectedDate)
         _ = SmartPlaceStore.shared
+
+        if authorizationStatus == .authorizedAlways || authorizationStatus == .authorizedWhenInUse {
+            manager.startUpdatingLocation()
+        }
+    }
+
+    func requestPermissions() {
+        manager.requestAlwaysAuthorization()
     }
 
     func reloadRoute(for date: Date) {
@@ -95,6 +104,7 @@ final class LocationService: NSObject, ObservableObject {
 extension LocationService: CLLocationManagerDelegate {
     nonisolated func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         Task { @MainActor in
+            self.authorizationStatus = manager.authorizationStatus
             let status = manager.authorizationStatus
             if status == .authorizedAlways || status == .authorizedWhenInUse {
                 manager.startUpdatingLocation()

@@ -12,11 +12,6 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Timeline", systemImage: "list.bullet")
                 }
-
-            SettingsScreen()
-                .tabItem {
-                    Label("Saved", systemImage: "house.fill")
-                }
         }
     }
 }
