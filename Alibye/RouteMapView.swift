@@ -5,6 +5,7 @@ struct RouteMapView: UIViewRepresentable {
     let coordinates: [CLLocationCoordinate2D]
     let visitCoordinates: [CLLocationCoordinate2D]
     var refreshToken: UUID
+    var movingCoordinate: CLLocationCoordinate2D? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -24,7 +25,10 @@ struct RouteMapView: UIViewRepresentable {
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         mapView.removeOverlays(mapView.overlays)
-        let existingAnnotations = mapView.annotations.filter { !($0 is MKUserLocation) }
+
+        let existingAnnotations = mapView.annotations.filter {
+            !($0 is MKUserLocation)
+        }
         mapView.removeAnnotations(existingAnnotations)
 
         if coordinates.count > 1 {
@@ -46,7 +50,15 @@ struct RouteMapView: UIViewRepresentable {
         for coordinate in visitCoordinates {
             let pin = MKPointAnnotation()
             pin.coordinate = coordinate
+            pin.title = "visit"
             mapView.addAnnotation(pin)
+        }
+
+        if let movingCoordinate {
+            let movingPin = MKPointAnnotation()
+            movingPin.coordinate = movingCoordinate
+            movingPin.title = "moving"
+            mapView.addAnnotation(movingPin)
         }
     }
 
@@ -63,16 +75,41 @@ struct RouteMapView: UIViewRepresentable {
         func mapView(_ mapView: MKMapView, viewFor annotation: MKAnnotation) -> MKAnnotationView? {
             guard !(annotation is MKUserLocation) else { return nil }
 
-            let identifier = "visit-pin"
-            let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
-                ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+            if annotation.title == "moving" {
+                let identifier = "moving-dot"
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier)
+                    ?? MKAnnotationView(annotation: annotation, reuseIdentifier: identifier)
 
-            view.annotation = annotation
-            view.markerTintColor = .systemBlue
-            view.glyphImage = UIImage(systemName: "mappin.and.ellipse")
-            view.titleVisibility = .hidden
-            view.subtitleVisibility = .hidden
-            return view
+                view.annotation = annotation
+                view.canShowCallout = false
+                view.image = movingDotImage()
+                view.centerOffset = CGPoint(x: 0, y: 0)
+                return view
+            } else {
+                let identifier = "visit-pin"
+                let view = mapView.dequeueReusableAnnotationView(withIdentifier: identifier) as? MKMarkerAnnotationView
+                    ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
+
+                view.annotation = annotation
+                view.markerTintColor = .systemBlue
+                view.glyphImage = UIImage(systemName: "mappin.and.ellipse")
+                view.titleVisibility = .hidden
+                view.subtitleVisibility = .hidden
+                return view
+            }
+        }
+
+        private func movingDotImage() -> UIImage? {
+            let renderer = UIGraphicsImageRenderer(size: CGSize(width: 24, height: 24))
+            return renderer.image { context in
+                let rect = CGRect(x: 0, y: 0, width: 24, height: 24)
+
+                UIColor.white.setFill()
+                context.cgContext.fillEllipse(in: rect)
+
+                UIColor.systemBlue.setFill()
+                context.cgContext.fillEllipse(in: rect.insetBy(dx: 4, dy: 4))
+            }
         }
     }
 }

@@ -9,6 +9,7 @@ struct TimelineReplayDetailView: View {
 
     @State private var sliderValue: Double = 0
     @State private var isPlaying = false
+    @State private var refreshToken = UUID()
 
     private var allSamples: [LocationSample] {
         historyStore.samples(for: date)
@@ -26,12 +27,19 @@ struct TimelineReplayDetailView: View {
         return Array(replaySamples.prefix(count)).map(\.coordinate)
     }
 
+    private var currentMovingCoordinate: CLLocationCoordinate2D? {
+        guard !replaySamples.isEmpty else { return nil }
+        let count = min(max(Int(sliderValue), 1), replaySamples.count)
+        return replaySamples[count - 1].coordinate
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             RouteMapView(
                 coordinates: displayedCoordinates,
                 visitCoordinates: [selectedVisit.coordinate],
-                refreshToken: UUID()
+                refreshToken: refreshToken,
+                movingCoordinate: currentMovingCoordinate
             )
             .ignoresSafeArea(edges: .top)
 
@@ -59,6 +67,9 @@ struct TimelineReplayDetailView: View {
                         in: 0...Double(max(replaySamples.count, 1)),
                         step: 1
                     )
+                    .onChange(of: sliderValue) { _, _ in
+                        refreshToken = UUID()
+                    }
 
                     HStack {
                         Button(isPlaying ? "Stop Replay" : "Play Replay") {
@@ -105,6 +116,7 @@ struct TimelineReplayDetailView: View {
         guard !replaySamples.isEmpty else { return }
         isPlaying = true
         sliderValue = 0
+        refreshToken = UUID()
 
         Task {
             for index in 1...replaySamples.count {
@@ -112,6 +124,7 @@ struct TimelineReplayDetailView: View {
                 try? await Task.sleep(for: .milliseconds(220))
                 await MainActor.run {
                     sliderValue = Double(index)
+                    refreshToken = UUID()
                 }
             }
             await MainActor.run {
