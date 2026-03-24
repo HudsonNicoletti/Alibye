@@ -3,53 +3,92 @@ import SwiftUI
 struct TimelineScreen: View {
     @EnvironmentObject var historyStore: HistoryStore
 
-    var body: some View {
-        NavigationView {
-            VStack {
-                DatePicker(
-                    "Day",
-                    selection: $historyStore.selectedDate,
-                    displayedComponents: .date
-                )
-                .datePickerStyle(.compact)
-                .padding(.horizontal)
-
-                List {
-                    let visits = historyStore.visits(for: historyStore.selectedDate)
-
-                    if visits.isEmpty {
-                        Text("No visits logged yet")
-                            .foregroundColor(.secondary)
-                    } else {
-                        ForEach(visits) { visit in
-                            VStack(alignment: .leading, spacing: 6) {
-                                Text(visit.title)
-                                    .font(.headline)
-
-                                Text("Arrived: \(visit.arrival.formatted(date: .omitted, time: .shortened))")
-
-                                if let departure = visit.departure {
-                                    Text("Left: \(departure.formatted(date: .omitted, time: .shortened))")
-                                    Text("Stay: \(formattedDuration(visit.durationSeconds))")
-                                        .foregroundColor(.secondary)
-                                } else {
-                                    Text("Left: Still here")
-                                        .foregroundColor(.secondary)
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Timeline")
-        }
+    private var visits: [VisitRecord] {
+        historyStore.visits(for: historyStore.selectedDate)
     }
 
-    private func formattedDuration(_ seconds: TimeInterval) -> String {
-        let formatter = DateComponentsFormatter()
-        formatter.allowedUnits = seconds >= 3600 ? [.hour, .minute] : [.minute]
-        formatter.unitsStyle = .abbreviated
-        return formatter.string(from: seconds) ?? "0m"
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: 14) {
+                    DatePicker(
+                        "Day",
+                        selection: $historyStore.selectedDate,
+                        displayedComponents: .date
+                    )
+                    .datePickerStyle(.compact)
+                    .padding(.horizontal)
+
+                    if visits.isEmpty {
+                        VStack(spacing: 10) {
+                            Image(systemName: "clock.arrow.circlepath")
+                                .font(.system(size: 30))
+                                .foregroundStyle(.secondary)
+                            Text("No visits logged yet")
+                                .font(.headline)
+                            Text("Walk around for a few minutes, then come back here.")
+                                .foregroundStyle(.secondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(30)
+                    } else {
+                        ForEach(visits) { visit in
+                            VisitCardView(visit: visit)
+                        }
+                        .padding(.horizontal)
+                    }
+                }
+                .padding(.vertical)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle(AppFormatters.dayLabel.string(from: historyStore.selectedDate))
+        }
+    }
+}
+
+private struct VisitCardView: View {
+    let visit: VisitRecord
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(spacing: 0) {
+                Circle()
+                    .fill(Color.blue)
+                    .frame(width: 12, height: 12)
+                Rectangle()
+                    .fill(Color.blue.opacity(0.25))
+                    .frame(width: 2)
+            }
+            .padding(.top, 8)
+
+            VStack(alignment: .leading, spacing: 8) {
+                Text(visit.title)
+                    .font(.headline)
+
+                if let subtitle = visit.subtitle, !subtitle.isEmpty {
+                    Text(subtitle)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 12) {
+                    Label(AppFormatters.timeLabel.string(from: visit.arrival), systemImage: "arrow.down.circle")
+                    Label(visit.departure.map { AppFormatters.timeLabel.string(from: $0) } ?? "Still here", systemImage: "arrow.up.circle")
+                }
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+                Text("Stay: \(AppFormatters.duration(visit.durationSeconds))")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(.background)
+        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.05), radius: 8, x: 0, y: 3)
     }
 }

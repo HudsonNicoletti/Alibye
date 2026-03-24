@@ -65,14 +65,30 @@ final class LocationService: NSObject, ObservableObject {
             case .arrived(let visit):
                 activeVisit = visit
                 store?.upsertVisit(visit, on: visit.arrival)
+                Task { await refreshPlaceName(for: visit) }
+
             case .updated(let visit):
                 activeVisit = visit
                 store?.upsertVisit(visit, on: visit.arrival)
+                if visit.title == "Visited Place" {
+                    Task { await refreshPlaceName(for: visit) }
+                }
+
             case .departed(let visit):
                 activeVisit = nil
                 store?.upsertVisit(visit, on: visit.arrival)
+                if visit.title == "Visited Place" {
+                    Task { await refreshPlaceName(for: visit) }
+                }
             }
         }
+    }
+
+    private func refreshPlaceName(for visit: VisitRecord) async {
+        let name = await PlaceResolver.shared.name(for: visit.coordinate)
+        var updated = visit
+        updated.title = name
+        store?.upsertVisit(updated, on: updated.arrival)
     }
 }
 
