@@ -34,7 +34,15 @@ struct TimelineScreen: View {
                         .padding(30)
                     } else {
                         ForEach(visits) { visit in
-                            VisitCardView(visit: visit)
+                            NavigationLink {
+                                TimelineReplayDetailView(
+                                    selectedVisit: visit,
+                                    date: historyStore.selectedDate
+                                )
+                            } label: {
+                                VisitCardView(visit: visit)
+                            }
+                            .buttonStyle(.plain)
                         }
                         .padding(.horizontal)
                     }
@@ -47,7 +55,7 @@ struct TimelineScreen: View {
     }
 }
 
-private struct VisitCardView: View {
+struct VisitCardView: View {
     let visit: VisitRecord
 
     var body: some View {
@@ -63,8 +71,14 @@ private struct VisitCardView: View {
             .padding(.top, 8)
 
             VStack(alignment: .leading, spacing: 8) {
-                Text(visit.title)
-                    .font(.headline)
+                HStack {
+                    Text(visit.title)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Image(systemName: "play.circle.fill")
+                        .foregroundStyle(.blue)
+                }
 
                 if let subtitle = visit.subtitle, !subtitle.isEmpty {
                     Text(subtitle)

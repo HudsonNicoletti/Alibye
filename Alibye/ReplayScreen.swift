@@ -30,7 +30,8 @@ struct ReplayScreen: View {
 
                 RouteMapView(
                     coordinates: displayedCoordinates,
-                    visitCoordinates: historyStore.visits(for: historyStore.selectedDate).map(\.coordinate)
+                    visitCoordinates: historyStore.visits(for: historyStore.selectedDate).map(\.coordinate),
+                    refreshToken: UUID()
                 )
 
                 VStack {

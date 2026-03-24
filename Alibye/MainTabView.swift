@@ -12,11 +12,6 @@ struct MainTabView: View {
                 .tabItem {
                     Label("Timeline", systemImage: "list.bullet")
                 }
-
-            ReplayScreen()
-                .tabItem {
-                    Label("Replay", systemImage: "play.circle")
-                }
         }
     }
 }
