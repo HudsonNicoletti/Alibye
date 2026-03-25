@@ -57,7 +57,8 @@ struct VisitRecord: Codable, Identifiable, Hashable {
     }
 }
 
-struct DayLog: Codable, Hashable {
+struct DayLog: Codable, Hashable, Identifiable {
+    var id: String { dateKey }
     let dateKey: String
     var samples: [LocationSample]
     var visits: [VisitRecord]

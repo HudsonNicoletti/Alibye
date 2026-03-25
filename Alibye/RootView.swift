@@ -15,3 +15,7 @@ struct RootView: View {
         }
     }
 }
+
+#Preview {
+    SetupView()
+}

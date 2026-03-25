@@ -4,7 +4,6 @@ import CoreLocation
 struct TimelineReplayDetailView: View {
     @EnvironmentObject var historyStore: HistoryStore
 
-    let selectedVisit: VisitRecord
     let date: Date
 
     @State private var sliderValue: Double = 0
@@ -15,35 +14,34 @@ struct TimelineReplayDetailView: View {
         historyStore.samples(for: date)
     }
 
-    private var replaySamples: [LocationSample] {
-        let start = selectedVisit.arrival.addingTimeInterval(-300)
-        let end = (selectedVisit.departure ?? selectedVisit.arrival).addingTimeInterval(300)
-        return allSamples.filter { $0.timestamp >= start && $0.timestamp <= end }
+    private var allVisits: [VisitRecord] {
+        historyStore.visits(for: date)
     }
 
     private var displayedCoordinates: [CLLocationCoordinate2D] {
-        guard !replaySamples.isEmpty else { return [] }
-        let count = min(max(Int(sliderValue.rounded(.down)), 0), replaySamples.count)
-        return Array(replaySamples.prefix(count)).map(\.coordinate)
+        guard !allSamples.isEmpty else { return [] }
+        let count = min(max(Int(sliderValue.rounded(.down)), 0), allSamples.count)
+        return Array(allSamples.prefix(count)).map(\.coordinate)
+    }
+
+    private var fullCoordinates: [CLLocationCoordinate2D] {
+        allSamples.map(\.coordinate)
     }
 
     private var currentMovingCoordinate: CLLocationCoordinate2D? {
-        guard !replaySamples.isEmpty else { return nil }
-        guard replaySamples.count > 1 else { return replaySamples.first?.coordinate }
+        guard !allSamples.isEmpty else { return nil }
+        guard allSamples.count > 1 else { return allSamples.first?.coordinate }
 
-        let clamped = min(max(sliderValue, 1), Double(replaySamples.count))
-        let lowerIndex = max(0, min(Int(floor(clamped)) - 1, replaySamples.count - 1))
-        let upperIndex = min(lowerIndex + 1, replaySamples.count - 1)
+        let clamped = min(max(sliderValue, 1), Double(allSamples.count))
+        let lowerIndex = max(0, min(Int(floor(clamped)) - 1, allSamples.count - 1))
+        let upperIndex = min(lowerIndex + 1, allSamples.count - 1)
 
-        let start = replaySamples[lowerIndex].coordinate
-        let end = replaySamples[upperIndex].coordinate
+        let start = allSamples[lowerIndex].coordinate
+        let end = allSamples[upperIndex].coordinate
 
-        if lowerIndex == upperIndex {
-            return start
-        }
+        if lowerIndex == upperIndex { return start }
 
         let t = clamped - floor(clamped)
-
         return CLLocationCoordinate2D(
             latitude: start.latitude + (end.latitude - start.latitude) * t,
             longitude: start.longitude + (end.longitude - start.longitude) * t
@@ -53,36 +51,37 @@ struct TimelineReplayDetailView: View {
     var body: some View {
         VStack(spacing: 0) {
             RouteMapView(
-                coordinates: displayedCoordinates,
-                visitCoordinates: [selectedVisit.coordinate],
+                coordinates: isPlaying || sliderValue > 0 ? displayedCoordinates : fullCoordinates,
+                visitCoordinates: allVisits.map(\.coordinate),
                 refreshToken: refreshToken,
-                movingCoordinate: currentMovingCoordinate,
+                followUser: false,
+                movingCoordinate: (isPlaying || sliderValue > 0) ? currentMovingCoordinate : nil,
                 heatmapCoordinates: []
             )
             .ignoresSafeArea(edges: .top)
 
             VStack(spacing: 16) {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text(selectedVisit.title)
+                    Text(date.formatted(date: .complete, time: .omitted))
                         .font(.title3.bold())
 
-                    HStack(spacing: 12) {
-                        Label(AppFormatters.timeLabel.string(from: selectedVisit.arrival), systemImage: "arrow.down.circle")
-                        Label(selectedVisit.departure.map { AppFormatters.timeLabel.string(from: $0) } ?? "Still here", systemImage: "arrow.up.circle")
+                    if let first = allSamples.first?.timestamp,
+                       let last = allSamples.last?.timestamp {
+                        Text("\(first.formatted(date: .omitted, time: .shortened)) - \(last.formatted(date: .omitted, time: .shortened))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
 
-                    Text("Stay: \(AppFormatters.duration(selectedVisit.durationSeconds))")
+                    Text("\(allSamples.count) route points • \(allVisits.count) visits")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-                VStack(spacing: 10) {
+                if !allSamples.isEmpty {
                     Slider(
                         value: $sliderValue,
-                        in: 0...Double(max(replaySamples.count, 1)),
+                        in: 0...Double(max(allSamples.count, 1)),
                         step: 0.05
                     )
                     .onChange(of: sliderValue) { _, _ in
@@ -95,35 +94,30 @@ struct TimelineReplayDetailView: View {
                         }
                         .buttonStyle(.borderedProminent)
 
+                        Button("Show Full Path") {
+                            stopReplay()
+                            sliderValue = 0
+                            refreshToken = UUID()
+                        }
+                        .buttonStyle(.bordered)
+
                         Spacer()
 
-                        Text("\(Int(sliderValue.rounded(.down)))/\(replaySamples.count)")
+                        Text("\(Int(sliderValue.rounded(.down)))/\(allSamples.count)")
                             .foregroundStyle(.secondary)
                     }
-                }
-
-                if replaySamples.isEmpty {
+                } else {
                     ContentUnavailableView(
                         "No replay points",
                         systemImage: "point.topleft.down.curvedto.point.bottomright.up",
-                        description: Text("There were not enough route samples around this visit to build a replay.")
+                        description: Text("There were not enough route samples for this day.")
                     )
-                } else {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Replay window")
-                            .font(.headline)
-
-                        Text("\(replaySamples.first?.timestamp.formatted(date: .omitted, time: .shortened) ?? "-") to \(replaySamples.last?.timestamp.formatted(date: .omitted, time: .shortened) ?? "-")")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
             .padding()
             .background(Color(.systemBackground))
         }
-        .navigationTitle("Visit Replay")
+        .navigationTitle("Day Replay")
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear {
             stopReplay()
@@ -131,13 +125,13 @@ struct TimelineReplayDetailView: View {
     }
 
     private func startReplay() {
-        guard !replaySamples.isEmpty else { return }
+        guard !allSamples.isEmpty else { return }
         isPlaying = true
-        sliderValue = 0
+        sliderValue = 1
         refreshToken = UUID()
 
         Task {
-            let target = Double(replaySamples.count)
+            let target = Double(allSamples.count)
             while isPlaying && sliderValue < target {
                 try? await Task.sleep(for: .milliseconds(28))
                 await MainActor.run {

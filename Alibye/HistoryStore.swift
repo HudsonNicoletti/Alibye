@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import SwiftUI
 
 @MainActor
 final class HistoryStore: ObservableObject {
@@ -54,6 +55,10 @@ final class HistoryStore: ObservableObject {
         logs[dayKey(for: date)]?.visits.sorted { $0.arrival < $1.arrival } ?? []
     }
 
+    func groupedDates() -> [Date] {
+        logs.keys.compactMap { Self.dayFormatter.date(from: $0) }.sorted(by: >)
+    }
+
     func load() {
         do {
             let url = try storageURL()
@@ -78,9 +83,7 @@ final class HistoryStore: ObservableObject {
     }
 
     func dayKey(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Calendar.current.startOfDay(for: date))
+        Self.dayFormatter.string(from: Calendar.current.startOfDay(for: date))
     }
 
     private func storageURL() throws -> URL {
@@ -92,4 +95,10 @@ final class HistoryStore: ObservableObject {
         )
         return docs.appendingPathComponent("alibye_logs.json")
     }
+
+    static let dayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
 }

@@ -8,7 +8,7 @@ struct SetupView: View {
 
     @State private var isRequesting = false
 
-    private let privacyPolicyURL = URL(string: "https://example.com/privacy")!
+    private let privacyPolicyURL = URL(string: "https://peerpad.net/#/r/markdown/3nvQ4TsNE4jQkSoVwh1LLZz6Fuwf57nCfr3R2kXWAkRU/4XTTM64bfRN4quD9ME8eHib2e7RGJDNyvuPZPDYZB6PuUaNZj")!
 
     var body: some View {
         ZStack {
@@ -241,3 +241,5 @@ private struct SetupFeatureRow: View {
         }
     }
 }
+
+

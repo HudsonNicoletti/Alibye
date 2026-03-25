@@ -2,7 +2,6 @@ import SwiftUI
 import MapKit
 
 struct MapScreen: View {
-    @EnvironmentObject var locationService: LocationService
     @EnvironmentObject var historyStore: HistoryStore
 
     @State private var refreshToken = UUID()
@@ -23,8 +22,9 @@ struct MapScreen: View {
                 coordinates: samples.map(\.coordinate),
                 visitCoordinates: visits.map(\.coordinate),
                 refreshToken: refreshToken,
+                followUser: true,
                 movingCoordinate: nil,
-                heatmapCoordinates: showHeatmap ? samples.map(\.coordinate) : []
+                heatmapCoordinates: showHeatmap ? visits.map(\.coordinate) : []
             )
             .ignoresSafeArea()
 
@@ -72,20 +72,13 @@ struct MapScreen: View {
         .sheet(isPresented: $showSavedLocations) {
             SettingsScreen()
         }
-        .onAppear {
-            locationService.reloadRoute(for: historyStore.selectedDate)
-        }
-        .onChange(of: historyStore.selectedDate) { _, newValue in
-            locationService.reloadRoute(for: newValue)
-            refreshToken = UUID()
-        }
     }
 
     private var bottomOverlay: some View {
         VStack(spacing: 12) {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Day Summary")
+                    Text("Live Summary")
                         .font(.headline)
 
                     Text(summaryText)
@@ -97,7 +90,7 @@ struct MapScreen: View {
             }
 
             HStack(spacing: 10) {
-                summaryPill(title: "Points", value: "\(samples.count)")
+                //summaryPill(title: "Points", value: "\(samples.count)")
                 summaryPill(title: "Visits", value: "\(visits.count)")
                 summaryPill(title: "Route", value: routeDistanceText)
             }
@@ -125,7 +118,7 @@ struct MapScreen: View {
 
     private var summaryText: String {
         if samples.isEmpty {
-            return "No route data for this day yet."
+            return "No route data yet."
         }
         if let first = samples.first?.timestamp, let last = samples.last?.timestamp {
             return "\(first.formatted(date: .omitted, time: .shortened)) to \(last.formatted(date: .omitted, time: .shortened))"
@@ -135,8 +128,8 @@ struct MapScreen: View {
 
     private var routeDistanceText: String {
         guard samples.count > 1 else { return "0 km" }
-        let coords = samples.map(\.coordinate)
         var total: CLLocationDistance = 0
+        let coords = samples.map(\.coordinate)
 
         for index in 1..<coords.count {
             let a = CLLocation(latitude: coords[index - 1].latitude, longitude: coords[index - 1].longitude)
@@ -144,10 +137,6 @@ struct MapScreen: View {
             total += b.distance(from: a)
         }
 
-        if total >= 1000 {
-            return String(format: "%.1f km", total / 1000)
-        } else {
-            return String(format: "%.0f m", total)
-        }
+        return total >= 1000 ? String(format: "%.1f km", total / 1000) : String(format: "%.0f m", total)
     }
 }

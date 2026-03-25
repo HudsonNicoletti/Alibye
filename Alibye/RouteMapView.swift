@@ -5,6 +5,7 @@ struct RouteMapView: UIViewRepresentable {
     let coordinates: [CLLocationCoordinate2D]
     let visitCoordinates: [CLLocationCoordinate2D]
     var refreshToken: UUID
+    var followUser: Bool = false
     var movingCoordinate: CLLocationCoordinate2D? = nil
     var heatmapCoordinates: [CLLocationCoordinate2D] = []
 
@@ -21,15 +22,16 @@ struct RouteMapView: UIViewRepresentable {
         mapView.showsScale = false
         mapView.isRotateEnabled = true
         mapView.isPitchEnabled = true
+        if followUser {
+            mapView.setUserTrackingMode(.follow, animated: false)
+        }
         return mapView
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
         mapView.removeOverlays(mapView.overlays)
 
-        let existingAnnotations = mapView.annotations.filter {
-            !($0 is MKUserLocation)
-        }
+        let existingAnnotations = mapView.annotations.filter { !($0 is MKUserLocation) }
         mapView.removeAnnotations(existingAnnotations)
 
         if !heatmapCoordinates.isEmpty {
@@ -43,17 +45,24 @@ struct RouteMapView: UIViewRepresentable {
         if coordinates.count > 1 {
             let polyline = MKPolyline(coordinates: coordinates, count: coordinates.count)
             mapView.addOverlay(polyline)
-            mapView.setVisibleMapRect(
-                polyline.boundingMapRect,
-                edgePadding: UIEdgeInsets(top: 180, left: 40, bottom: 220, right: 40),
-                animated: true
-            )
-        } else if let first = coordinates.first {
+
+            if !followUser {
+                mapView.setVisibleMapRect(
+                    polyline.boundingMapRect,
+                    edgePadding: UIEdgeInsets(top: 160, left: 40, bottom: 220, right: 40),
+                    animated: false
+                )
+            }
+        } else if let first = coordinates.first, !followUser {
             let region = MKCoordinateRegion(
                 center: first,
                 span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
             )
-            mapView.setRegion(region, animated: true)
+            mapView.setRegion(region, animated: false)
+        }
+
+        if followUser {
+            mapView.setUserTrackingMode(.follow, animated: false)
         }
 
         for coordinate in visitCoordinates {
@@ -68,6 +77,12 @@ struct RouteMapView: UIViewRepresentable {
             movingPin.coordinate = movingCoordinate
             movingPin.title = "moving"
             mapView.addAnnotation(movingPin)
+
+            let region = MKCoordinateRegion(
+                center: movingCoordinate,
+                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+            )
+            mapView.setRegion(region, animated: false)
         }
     }
 
@@ -144,14 +159,12 @@ struct RouteMapView: UIViewRepresentable {
 
         private func movingDotImage() -> UIImage? {
             let renderer = UIGraphicsImageRenderer(size: CGSize(width: 26, height: 26))
-            return renderer.image { context in
-                let rect = CGRect(x: 0, y: 0, width: 26, height: 26)
-
+            return renderer.image { _ in
                 UIColor.white.setFill()
-                context.cgContext.fillEllipse(in: rect)
+                UIBezierPath(ovalIn: CGRect(x: 0, y: 0, width: 26, height: 26)).fill()
 
                 UIColor.systemBlue.setFill()
-                context.cgContext.fillEllipse(in: rect.insetBy(dx: 4, dy: 4))
+                UIBezierPath(ovalIn: CGRect(x: 4, y: 4, width: 18, height: 18)).fill()
             }
         }
     }
