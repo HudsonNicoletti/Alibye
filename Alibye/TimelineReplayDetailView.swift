@@ -48,6 +48,12 @@ struct TimelineReplayDetailView: View {
         )
     }
 
+    private var currentReplayIndex: Int? {
+        guard !allSamples.isEmpty, (isPlaying || sliderValue > 0) else { return nil }
+        let idx = max(0, min(Int(sliderValue.rounded(.down)) - 1, allSamples.count - 1))
+        return idx
+    }
+
     var body: some View {
         ZStack {
             RouteMapView(
@@ -101,7 +107,6 @@ struct TimelineReplayDetailView: View {
             }
 
             HStack(spacing: 10) {
-                summaryPill(title: "Points", value: "\(allSamples.count)")
                 summaryPill(title: "Visits", value: "\(allVisits.count)")
                 summaryPill(title: "Shown", value: shownCountText)
             }
@@ -151,13 +156,62 @@ struct TimelineReplayDetailView: View {
     }
 
     private var replayStateBadge: some View {
-        Text(isPlaying ? "Replaying" : "Ready")
+        Text(statusText)
             .font(.caption.weight(.semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
-            .background((isPlaying ? Color.blue : Color.secondary).opacity(0.15))
-            .foregroundStyle(isPlaying ? .blue : .secondary)
+            .background(statusColor.opacity(0.15))
+            .foregroundStyle(statusColor)
             .clipShape(Capsule())
+    }
+
+    private var statusText: String {
+        if sliderValue <= 0 || allSamples.isEmpty {
+            return "Full path"
+        }
+
+        if let visit = currentVisit {
+            let lowered = visit.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if lowered == "home" {
+                return "At Home"
+            } else if lowered == "work" {
+                return "At Work"
+            } else if lowered == "visited place" || lowered == "possible home" || lowered == "possible work" || lowered == "other frequent place" || lowered.isEmpty {
+                return "Visiting"
+            } else {
+                return "At \(visit.title)"
+            }
+        }
+
+        return "Moving"
+    }
+
+    private var statusColor: Color {
+        if sliderValue <= 0 || allSamples.isEmpty {
+            return .secondary
+        }
+
+        if let visit = currentVisit {
+            let lowered = visit.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            if lowered == "home" {
+                return .green
+            } else if lowered == "work" {
+                return .orange
+            } else {
+                return .blue
+            }
+        }
+
+        return .purple
+    }
+
+    private var currentVisit: VisitRecord? {
+        guard let index = currentReplayIndex else { return nil }
+        let sample = allSamples[index]
+        return allVisits.first(where: { visit in
+            let end = visit.departure ?? visit.arrival
+            return sample.timestamp >= visit.arrival && sample.timestamp <= end
+        })
     }
 
     private func summaryPill(title: String, value: String) -> some View {
