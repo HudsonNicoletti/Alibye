@@ -1,6 +1,6 @@
 import Foundation
 import Combine
-import SwiftUI
+import CoreLocation
 
 @MainActor
 final class HistoryStore: ObservableObject {
@@ -36,8 +36,10 @@ final class HistoryStore: ObservableObject {
         let key = dayKey(for: day)
         var log = logs[key] ?? DayLog(dateKey: key, samples: [], visits: [])
 
-        if let index = log.visits.firstIndex(where: { $0.id == visit.id }) {
-            log.visits[index] = visit
+        if let exactIndex = log.visits.firstIndex(where: { $0.id == visit.id }) {
+            log.visits[exactIndex] = visit
+        } else if let mergeIndex = mergeCandidateIndex(for: visit, in: log.visits) {
+            log.visits[mergeIndex] = mergedVisit(log.visits[mergeIndex], with: visit)
         } else {
             log.visits.append(visit)
         }
@@ -94,6 +96,55 @@ final class HistoryStore: ObservableObject {
             create: true
         )
         return docs.appendingPathComponent("alibye_logs.json")
+    }
+
+    private func mergeCandidateIndex(for newVisit: VisitRecord, in visits: [VisitRecord]) -> Int? {
+        let mergeRadius: CLLocationDistance = 120
+        let mergeGap: TimeInterval = 20 * 60
+
+        return visits.firstIndex { existing in
+            let a = CLLocation(latitude: existing.latitude, longitude: existing.longitude)
+            let b = CLLocation(latitude: newVisit.latitude, longitude: newVisit.longitude)
+            let distance = a.distance(from: b)
+
+            let existingEnd = existing.departure ?? existing.arrival
+            let newEnd = newVisit.departure ?? newVisit.arrival
+
+            let gap1 = abs(newVisit.arrival.timeIntervalSince(existingEnd))
+            let gap2 = abs(existing.arrival.timeIntervalSince(newEnd))
+            let smallestGap = min(gap1, gap2)
+
+            return distance <= mergeRadius && smallestGap <= mergeGap
+        }
+    }
+
+    private func mergedVisit(_ existing: VisitRecord, with newVisit: VisitRecord) -> VisitRecord {
+        var merged = existing
+
+        let existingEnd = existing.departure ?? existing.arrival
+        let newEnd = newVisit.departure ?? newVisit.arrival
+
+        merged.arrival = min(existing.arrival, newVisit.arrival)
+        merged.departure = max(existingEnd, newEnd)
+
+        // Average coordinates so repeated indoor updates stay centered on one place
+        merged.latitude = (existing.latitude + newVisit.latitude) / 2
+        merged.longitude = (existing.longitude + newVisit.longitude) / 2
+
+        if isGeneric(existing.title) && !isGeneric(newVisit.title) {
+            merged.title = newVisit.title
+        }
+
+        return merged
+    }
+
+    private func isGeneric(_ title: String) -> Bool {
+        let lowered = title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return lowered.isEmpty
+            || lowered == "visited place"
+            || lowered == "possible home"
+            || lowered == "possible work"
+            || lowered == "other frequent place"
     }
 
     static let dayFormatter: DateFormatter = {
