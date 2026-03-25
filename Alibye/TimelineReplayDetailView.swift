@@ -49,7 +49,7 @@ struct TimelineReplayDetailView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
+        ZStack {
             RouteMapView(
                 coordinates: isPlaying || sliderValue > 0 ? displayedCoordinates : fullCoordinates,
                 visitCoordinates: allVisits.map(\.coordinate),
@@ -58,27 +58,56 @@ struct TimelineReplayDetailView: View {
                 movingCoordinate: (isPlaying || sliderValue > 0) ? currentMovingCoordinate : nil,
                 heatmapCoordinates: []
             )
-            .ignoresSafeArea(edges: .top)
+            .ignoresSafeArea()
 
-            VStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack {
+                Spacer()
+                bottomOverlay
+            }
+            .padding(.horizontal, 16)
+            .padding(.bottom, 12)
+        }
+        .navigationTitle("Day Replay")
+        .navigationBarTitleDisplayMode(.inline)
+        .onDisappear {
+            stopReplay()
+        }
+    }
+
+    private var bottomOverlay: some View {
+        VStack(spacing: 14) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 4) {
                     Text(date.formatted(date: .complete, time: .omitted))
-                        .font(.title3.bold())
+                        .font(.headline)
 
                     if let first = allSamples.first?.timestamp,
                        let last = allSamples.last?.timestamp {
-                        Text("\(first.formatted(date: .omitted, time: .shortened)) - \(last.formatted(date: .omitted, time: .shortened))")
+                        Text("\(first.formatted(date: .omitted, time: .shortened)) to \(last.formatted(date: .omitted, time: .shortened))")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("No route data for this day.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
-
-                    Text("\(allSamples.count) route points • \(allVisits.count) visits")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Spacer()
 
                 if !allSamples.isEmpty {
+                    replayStateBadge
+                }
+            }
+
+            HStack(spacing: 10) {
+                summaryPill(title: "Points", value: "\(allSamples.count)")
+                summaryPill(title: "Visits", value: "\(allVisits.count)")
+                summaryPill(title: "Shown", value: shownCountText)
+            }
+
+            if !allSamples.isEmpty {
+                VStack(spacing: 10) {
                     Slider(
                         value: $sliderValue,
                         in: 0...Double(max(allSamples.count, 1)),
@@ -88,39 +117,68 @@ struct TimelineReplayDetailView: View {
                         refreshToken = UUID()
                     }
 
-                    HStack {
-                        Button(isPlaying ? "Stop Replay" : "Play Replay") {
+                    HStack(spacing: 10) {
+                        Button {
                             isPlaying ? stopReplay() : startReplay()
+                        } label: {
+                            Label(isPlaying ? "Stop" : "Play Replay", systemImage: isPlaying ? "pause.fill" : "play.fill")
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
 
-                        Button("Show Full Path") {
+                        Button {
                             stopReplay()
                             sliderValue = 0
                             refreshToken = UUID()
+                        } label: {
+                            Label("Full Path", systemImage: "arrow.triangle.branch")
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.bordered)
-
-                        Spacer()
-
-                        Text("\(Int(sliderValue.rounded(.down)))/\(allSamples.count)")
-                            .foregroundStyle(.secondary)
                     }
-                } else {
-                    ContentUnavailableView(
-                        "No replay points",
-                        systemImage: "point.topleft.down.curvedto.point.bottomright.up",
-                        description: Text("There were not enough route samples for this day.")
-                    )
                 }
+            } else {
+                Text("There were not enough route samples for this day.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding()
-            .background(Color(.systemBackground))
         }
-        .navigationTitle("Day Replay")
-        .navigationBarTitleDisplayMode(.inline)
-        .onDisappear {
-            stopReplay()
+        .padding(16)
+        .background(.ultraThinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .shadow(color: .black.opacity(0.12), radius: 12, x: 0, y: 6)
+    }
+
+    private var replayStateBadge: some View {
+        Text(isPlaying ? "Replaying" : "Ready")
+            .font(.caption.weight(.semibold))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background((isPlaying ? Color.blue : Color.secondary).opacity(0.15))
+            .foregroundStyle(isPlaying ? .blue : .secondary)
+            .clipShape(Capsule())
+    }
+
+    private func summaryPill(title: String, value: String) -> some View {
+        VStack(spacing: 4) {
+            Text(value)
+                .font(.headline)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.18))
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+    }
+
+    private var shownCountText: String {
+        if isPlaying || sliderValue > 0 {
+            return "\(Int(sliderValue.rounded(.down)))"
+        } else {
+            return "All"
         }
     }
 
