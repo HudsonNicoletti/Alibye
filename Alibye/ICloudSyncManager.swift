@@ -5,15 +5,26 @@ import Combine
 final class ICloudSyncManager: ObservableObject {
     static let shared = ICloudSyncManager()
 
+    // MARK: - Published State
+
     @Published var isICloudAvailable = false
     @Published var lastSyncDate: Date?
+
+    // MARK: - Internal State
 
     private weak var historyStore: HistoryStore?
     private weak var smartPlaceStore: SmartPlaceStore?
     private var metadataQuery: NSMetadataQuery?
     private var observers: [NSObjectProtocol] = []
 
+    private enum Constants {
+        static let historyFileName = "alibye_logs.json"
+        static let placesFileName = "alibye_smart_places.json"
+    }
+
     private init() {}
+
+    // MARK: - Public API
 
     func start(historyStore: HistoryStore, smartPlaceStore: SmartPlaceStore) async {
         self.historyStore = historyStore
@@ -30,28 +41,30 @@ final class ICloudSyncManager: ObservableObject {
     }
 
     func syncHistoryNow() {
-        Task { await pushLocalFileToICloud(named: "alibye_logs.json") }
+        Task { await pushLocalFileToICloud(named: Constants.historyFileName) }
     }
 
     func syncPlacesNow() {
-        Task { await pushLocalFileToICloud(named: "alibye_smart_places.json") }
+        Task { await pushLocalFileToICloud(named: Constants.placesFileName) }
     }
 
     func syncAllNow() {
         Task {
-            await pushLocalFileToICloud(named: "alibye_logs.json")
-            await pushLocalFileToICloud(named: "alibye_smart_places.json")
+            await pushLocalFileToICloud(named: Constants.historyFileName)
+            await pushLocalFileToICloud(named: Constants.placesFileName)
             lastSyncDate = .now
         }
     }
 
     func pullFromICloudIfAvailable() async {
-        await pullICloudFileToLocal(named: "alibye_logs.json")
-        await pullICloudFileToLocal(named: "alibye_smart_places.json")
+        await pullICloudFileToLocal(named: Constants.historyFileName)
+        await pullICloudFileToLocal(named: Constants.placesFileName)
         historyStore?.load()
         smartPlaceStore?.load()
         lastSyncDate = .now
     }
+
+    // MARK: - Query Lifecycle
 
     private func startMetadataQuery() {
         let query = NSMetadataQuery()
@@ -84,8 +97,12 @@ final class ICloudSyncManager: ObservableObject {
     }
 
     private func handleMetadataUpdate(_ query: NSMetadataQuery) async {
+        _ = query
+        // Pull latest snapshots whenever iCloud metadata indicates changes.
         await pullFromICloudIfAvailable()
     }
+
+    // MARK: - File Locations
 
     private func localDocumentsURL() throws -> URL {
         try FileManager.default.url(
@@ -106,6 +123,8 @@ final class ICloudSyncManager: ObservableObject {
 
         return docs
     }
+
+    // MARK: - Sync Operations
 
     private func pushLocalFileToICloud(named fileName: String) async {
         guard let cloudDocs = iCloudDocumentsURL() else { return }

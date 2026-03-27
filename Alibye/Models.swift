@@ -1,6 +1,8 @@
 import Foundation
 import CoreLocation
 
+// MARK: - Tracking Models
+
 struct LocationSample: Codable, Identifiable, Hashable {
     let id: UUID
     let latitude: Double
@@ -20,6 +22,8 @@ struct LocationSample: Codable, Identifiable, Hashable {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
     }
 }
+
+// MARK: - Visit Models
 
 struct VisitRecord: Codable, Identifiable, Hashable {
     let id: UUID
@@ -49,11 +53,16 @@ struct VisitRecord: Codable, Identifiable, Hashable {
     }
 
     var durationSeconds: TimeInterval {
-        (departure ?? arrival).timeIntervalSince(arrival)
+        let effectiveEnd = departure ?? .now
+        return max(0, effectiveEnd.timeIntervalSince(arrival))
     }
 
     var coordinate: CLLocationCoordinate2D {
         CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+    }
+
+    var effectiveDeparture: Date {
+        departure ?? .now
     }
 }
 
@@ -63,6 +72,8 @@ struct DayLog: Codable, Hashable, Identifiable {
     var samples: [LocationSample]
     var visits: [VisitRecord]
 }
+
+// MARK: - Smart Places
 
 struct SmartPlace: Codable, Identifiable, Hashable {
     let id: UUID

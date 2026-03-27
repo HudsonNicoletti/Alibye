@@ -2,16 +2,26 @@ import SwiftUI
 import MapKit
 
 struct RouteMapView: UIViewRepresentable {
+    // MARK: - Inputs
+
     let coordinates: [CLLocationCoordinate2D]
-    let visitCoordinates: [CLLocationCoordinate2D]
+    let visits: [VisitRecord]
     var refreshToken: UUID
     var followUser: Bool = false
     var movingCoordinate: CLLocationCoordinate2D? = nil
     var heatmapCoordinates: [CLLocationCoordinate2D] = []
+    var onVisitTapped: ((VisitRecord) -> Void)? = nil
+
+    private enum Constants {
+        static let defaultSpan = MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+        static let routePadding = UIEdgeInsets(top: 160, left: 40, bottom: 220, right: 40)
+    }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(onVisitTapped: onVisitTapped)
     }
+
+    // MARK: - UIViewRepresentable
 
     func makeUIView(context: Context) -> MKMapView {
         let mapView = MKMapView()
@@ -29,6 +39,8 @@ struct RouteMapView: UIViewRepresentable {
     }
 
     func updateUIView(_ mapView: MKMapView, context: Context) {
+        context.coordinator.onVisitTapped = onVisitTapped
+
         mapView.removeOverlays(mapView.overlays)
 
         let existingAnnotations = mapView.annotations.filter { !($0 is MKUserLocation) }
@@ -49,14 +61,14 @@ struct RouteMapView: UIViewRepresentable {
             if !followUser {
                 mapView.setVisibleMapRect(
                     polyline.boundingMapRect,
-                    edgePadding: UIEdgeInsets(top: 160, left: 40, bottom: 220, right: 40),
+                    edgePadding: Constants.routePadding,
                     animated: false
                 )
             }
         } else if let first = coordinates.first, !followUser {
             let region = MKCoordinateRegion(
                 center: first,
-                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                span: Constants.defaultSpan
             )
             mapView.setRegion(region, animated: false)
         }
@@ -65,10 +77,8 @@ struct RouteMapView: UIViewRepresentable {
             mapView.setUserTrackingMode(.follow, animated: false)
         }
 
-        for coordinate in visitCoordinates {
-            let pin = MKPointAnnotation()
-            pin.coordinate = coordinate
-            pin.title = "visit"
+        for visit in visits {
+            let pin = VisitAnnotation(visit: visit)
             mapView.addAnnotation(pin)
         }
 
@@ -80,11 +90,13 @@ struct RouteMapView: UIViewRepresentable {
 
             let region = MKCoordinateRegion(
                 center: movingCoordinate,
-                span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+                span: Constants.defaultSpan
             )
             mapView.setRegion(region, animated: false)
         }
     }
+
+    // MARK: - Heatmap
 
     private func aggregatedHeatmapCells(from coordinates: [CLLocationCoordinate2D]) -> [HeatCell] {
         var buckets: [String: Int] = [:]
@@ -105,6 +117,8 @@ struct RouteMapView: UIViewRepresentable {
         }
     }
 
+    // MARK: - Supporting Types
+
     struct HeatCell {
         let coordinate: CLLocationCoordinate2D
         let weight: Int
@@ -112,6 +126,14 @@ struct RouteMapView: UIViewRepresentable {
     }
 
     final class Coordinator: NSObject, MKMapViewDelegate {
+        var onVisitTapped: ((VisitRecord) -> Void)?
+
+        init(onVisitTapped: ((VisitRecord) -> Void)?) {
+            self.onVisitTapped = onVisitTapped
+        }
+
+        // MARK: - MKMapViewDelegate
+
         func mapView(_ mapView: MKMapView, rendererFor overlay: MKOverlay) -> MKOverlayRenderer {
             if let weighted = overlay as? WeightedCircle {
                 let renderer = MKCircleRenderer(circle: weighted)
@@ -149,6 +171,7 @@ struct RouteMapView: UIViewRepresentable {
                     ?? MKMarkerAnnotationView(annotation: annotation, reuseIdentifier: identifier)
 
                 view.annotation = annotation
+                view.canShowCallout = false
                 view.markerTintColor = .systemBlue
                 view.glyphImage = UIImage(systemName: "mappin.and.ellipse")
                 view.titleVisibility = .hidden
@@ -157,7 +180,13 @@ struct RouteMapView: UIViewRepresentable {
             }
         }
 
+        func mapView(_ mapView: MKMapView, didSelect view: MKAnnotationView) {
+            guard let visitAnnotation = view.annotation as? VisitAnnotation else { return }
+            onVisitTapped?(visitAnnotation.visit)
+        }
+
         private func movingDotImage() -> UIImage? {
+            // Simple two-layer dot for replay marker visibility above the route.
             let renderer = UIGraphicsImageRenderer(size: CGSize(width: 26, height: 26))
             return renderer.image { _ in
                 UIColor.white.setFill()
@@ -176,5 +205,17 @@ final class WeightedCircle: MKCircle {
     convenience init(center: CLLocationCoordinate2D, radius: CLLocationDistance, weight: Int) {
         self.init(center: center, radius: radius)
         self.weight = weight
+    }
+}
+
+final class VisitAnnotation: NSObject, MKAnnotation {
+    let visit: VisitRecord
+    let coordinate: CLLocationCoordinate2D
+    let title: String?
+
+    init(visit: VisitRecord) {
+        self.visit = visit
+        self.coordinate = visit.coordinate
+        self.title = visit.title
     }
 }

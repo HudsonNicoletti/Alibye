@@ -3,9 +3,13 @@ import SwiftUI
 struct TimelineScreen: View {
     @EnvironmentObject var historyStore: HistoryStore
 
+    // MARK: - Derived Data
+
     private var days: [Date] {
         historyStore.groupedDates()
     }
+
+    // MARK: - UI
 
     var body: some View {
         NavigationView {

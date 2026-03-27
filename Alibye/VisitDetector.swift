@@ -8,12 +8,14 @@ enum VisitEvent {
 }
 
 final class VisitDetector {
+    // MARK: - Detection Thresholds
+
     // Bigger radius to avoid apartment/indoor jitter creating many places
     private let stayRadius: CLLocationDistance = 90
     private let departureRadius: CLLocationDistance = 140
 
     // Require a longer dwell before creating a place
-    private let minimumDwell: TimeInterval = 8 * 60
+    private let minimumDwell: TimeInterval = 3 * 60
 
     // Must be outside the place for a bit before we consider it departed
     private let minimumAwayTime: TimeInterval = 2 * 60
@@ -26,6 +28,8 @@ final class VisitDetector {
     private var runningLatitude: Double = 0
     private var runningLongitude: Double = 0
     private var runningCount: Int = 0
+
+    // MARK: - Public API
 
     func process(_ location: CLLocation) -> VisitEvent? {
         if var activeVisit {
@@ -98,6 +102,8 @@ final class VisitDetector {
 
         return nil
     }
+
+    // MARK: - Running Average
 
     private func resetRunningAverage(with location: CLLocation) {
         runningLatitude = location.coordinate.latitude

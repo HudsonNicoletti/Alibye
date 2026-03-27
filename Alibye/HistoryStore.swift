@@ -6,8 +6,12 @@ import CoreLocation
 final class HistoryStore: ObservableObject {
     static let shared = HistoryStore()
 
+    // MARK: - Published State
+
     @Published var logs: [String: DayLog] = [:]
     @Published var selectedDate: Date = .now
+
+    // MARK: - Persistence
 
     private let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -22,7 +26,15 @@ final class HistoryStore: ObservableObject {
         return decoder
     }()
 
+    private enum Constants {
+        static let storageFileName = "alibye_logs.json"
+        static let mergeRadius: CLLocationDistance = 120
+        static let mergeGap: TimeInterval = 20 * 60
+    }
+
     private init() {}
+
+    // MARK: - Write API
 
     func append(sample: LocationSample) {
         let key = dayKey(for: sample.timestamp)
@@ -48,6 +60,35 @@ final class HistoryStore: ObservableObject {
         logs[key] = log
         save()
     }
+
+    func renameVisits(near coordinate: CLLocationCoordinate2D, radius: CLLocationDistance = 120, newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let target = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
+        let keys = Array(logs.keys)
+
+        for key in keys {
+            guard var log = logs[key] else { continue }
+            var changed = false
+
+            for index in log.visits.indices {
+                let visitLocation = CLLocation(latitude: log.visits[index].latitude, longitude: log.visits[index].longitude)
+                if target.distance(from: visitLocation) <= radius {
+                    log.visits[index].title = trimmed
+                    changed = true
+                }
+            }
+
+            if changed {
+                logs[key] = log
+            }
+        }
+
+        save()
+    }
+
+    // MARK: - Read API
 
     func samples(for date: Date) -> [LocationSample] {
         logs[dayKey(for: date)]?.samples.sorted { $0.timestamp < $1.timestamp } ?? []
@@ -88,6 +129,8 @@ final class HistoryStore: ObservableObject {
         Self.dayFormatter.string(from: Calendar.current.startOfDay(for: date))
     }
 
+    // MARK: - Private Helpers
+
     private func storageURL() throws -> URL {
         let docs = try FileManager.default.url(
             for: .documentDirectory,
@@ -95,13 +138,11 @@ final class HistoryStore: ObservableObject {
             appropriateFor: nil,
             create: true
         )
-        return docs.appendingPathComponent("alibye_logs.json")
+        return docs.appendingPathComponent(Constants.storageFileName)
     }
 
     private func mergeCandidateIndex(for newVisit: VisitRecord, in visits: [VisitRecord]) -> Int? {
-        let mergeRadius: CLLocationDistance = 120
-        let mergeGap: TimeInterval = 20 * 60
-
+        // Merge fragmented visits when they are spatially close and nearly contiguous in time.
         return visits.firstIndex { existing in
             let a = CLLocation(latitude: existing.latitude, longitude: existing.longitude)
             let b = CLLocation(latitude: newVisit.latitude, longitude: newVisit.longitude)
@@ -114,7 +155,7 @@ final class HistoryStore: ObservableObject {
             let gap2 = abs(existing.arrival.timeIntervalSince(newEnd))
             let smallestGap = min(gap1, gap2)
 
-            return distance <= mergeRadius && smallestGap <= mergeGap
+            return distance <= Constants.mergeRadius && smallestGap <= Constants.mergeGap
         }
     }
 
@@ -124,10 +165,11 @@ final class HistoryStore: ObservableObject {
         let existingEnd = existing.departure ?? existing.arrival
         let newEnd = newVisit.departure ?? newVisit.arrival
 
+        // Keep one canonical visit span that covers both intervals.
         merged.arrival = min(existing.arrival, newVisit.arrival)
         merged.departure = max(existingEnd, newEnd)
 
-        // Average coordinates so repeated indoor updates stay centered on one place
+        // Average centers to smooth noisy clusters around one place.
         merged.latitude = (existing.latitude + newVisit.latitude) / 2
         merged.longitude = (existing.longitude + newVisit.longitude) / 2
 
@@ -146,6 +188,8 @@ final class HistoryStore: ObservableObject {
             || lowered == "possible work"
             || lowered == "other frequent place"
     }
+
+    // MARK: - Static
 
     static let dayFormatter: DateFormatter = {
         let f = DateFormatter()

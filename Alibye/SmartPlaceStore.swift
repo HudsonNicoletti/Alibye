@@ -6,7 +6,11 @@ import Combine
 final class SmartPlaceStore: ObservableObject {
     static let shared = SmartPlaceStore()
 
+    // MARK: - Published State
+
     @Published var places: [SmartPlace] = []
+
+    // MARK: - Persistence
 
     private let encoder: JSONEncoder = {
         let e = JSONEncoder()
@@ -21,9 +25,21 @@ final class SmartPlaceStore: ObservableObject {
         return d
     }()
 
+    private enum Constants {
+        static let storageFileName = "alibye_smart_places.json"
+        static let labelRadius: CLLocationDistance = 100
+        static let recordVisitRadius: CLLocationDistance = 80
+        static let renameRadius: CLLocationDistance = 120
+        static let frequentVisitThreshold = 3
+        static let genericVisitedName = "Visited Place"
+        static let genericOtherName = "Other Frequent Place"
+    }
+
     private init() {
         load()
     }
+
+    // MARK: - Persistence API
 
     func load() {
         do {
@@ -46,11 +62,13 @@ final class SmartPlaceStore: ObservableObject {
         }
     }
 
+    // MARK: - Lookup API
+
     func label(for coordinate: CLLocationCoordinate2D) -> String? {
         nearestPlace(to: coordinate)?.name
     }
 
-    func nearestPlace(to coordinate: CLLocationCoordinate2D, within radius: CLLocationDistance = 100) -> SmartPlace? {
+    func nearestPlace(to coordinate: CLLocationCoordinate2D, within radius: CLLocationDistance = Constants.labelRadius) -> SmartPlace? {
         let target = CLLocation(latitude: coordinate.latitude, longitude: coordinate.longitude)
         return places
             .compactMap { place -> (SmartPlace, CLLocationDistance)? in
@@ -62,8 +80,10 @@ final class SmartPlaceStore: ObservableObject {
             .first?.0
     }
 
+    // MARK: - Mutation API
+
     func recordVisit(at coordinate: CLLocationCoordinate2D, arrival: Date, departure: Date?) {
-        if let existing = nearestPlace(to: coordinate, within: 80),
+        if let existing = nearestPlace(to: coordinate, within: Constants.recordVisitRadius),
            let index = places.firstIndex(where: { $0.id == existing.id }) {
             places[index].visitCount += 1
             places[index].lastSeen = departure ?? arrival
@@ -90,25 +110,55 @@ final class SmartPlaceStore: ObservableObject {
 
     func renamePlace(id: UUID, newName: String) {
         guard let index = places.firstIndex(where: { $0.id == id }) else { return }
-        places[index].name = newName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? places[index].name : newName
+        renamePlace(at: index, newName: newName)
+    }
+
+    func renamePlace(near coordinate: CLLocationCoordinate2D, within radius: CLLocationDistance = Constants.renameRadius, newName: String) {
+        if let existing = nearestPlace(to: coordinate, within: radius),
+           let index = places.firstIndex(where: { $0.id == existing.id }) {
+            renamePlace(at: index, newName: newName)
+            return
+        }
+
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        let place = SmartPlace(
+            name: trimmed,
+            latitude: coordinate.latitude,
+            longitude: coordinate.longitude,
+            category: .custom,
+            visitCount: 1,
+            lastSeen: .now
+        )
+        places.append(place)
+        save()
+    }
+
+    private func renamePlace(at index: Int, newName: String) {
+        let trimmed = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        places[index].name = trimmed
         places[index].category = .custom
         save()
     }
+
+    // MARK: - Classification
 
     private func autoCategorize(index: Int, arrival: Date) {
         let hour = Calendar.current.component(.hour, from: arrival)
         let weekday = Calendar.current.component(.weekday, from: arrival)
         let isWeekday = (2...6).contains(weekday)
 
-        if places[index].visitCount >= 3 {
+        if places[index].visitCount >= Constants.frequentVisitThreshold {
             if (20...23).contains(hour) || (0...6).contains(hour) {
                 places[index].category = .home
-                places[index].name = places[index].name == "Visited Place" || places[index].name == "Other Frequent Place" ? "Home" : places[index].name
+                places[index].name = isGenericSuggestedName(places[index].name) ? "Home" : places[index].name
             } else if isWeekday && (8...18).contains(hour) {
                 places[index].category = .work
-                places[index].name = places[index].name == "Visited Place" || places[index].name == "Other Frequent Place" ? "Work" : places[index].name
+                places[index].name = isGenericSuggestedName(places[index].name) ? "Work" : places[index].name
             } else if places[index].category == .other {
-                places[index].name = "Other Frequent Place"
+                places[index].name = Constants.genericOtherName
             }
         }
     }
@@ -124,7 +174,11 @@ final class SmartPlaceStore: ObservableObject {
         if isWeekday && (8...18).contains(hour) {
             return "Possible Work"
         }
-        return "Visited Place"
+        return Constants.genericVisitedName
+    }
+
+    private func isGenericSuggestedName(_ name: String) -> Bool {
+        name == Constants.genericVisitedName || name == Constants.genericOtherName
     }
 
     private func storageURL() throws -> URL {
@@ -134,6 +188,6 @@ final class SmartPlaceStore: ObservableObject {
             appropriateFor: nil,
             create: true
         )
-        return docs.appendingPathComponent("alibye_smart_places.json")
+        return docs.appendingPathComponent(Constants.storageFileName)
     }
 }

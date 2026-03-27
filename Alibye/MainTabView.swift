@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct MainTabView: View {
+    // MARK: - UI
+
     var body: some View {
         TabView {
             MapScreen()

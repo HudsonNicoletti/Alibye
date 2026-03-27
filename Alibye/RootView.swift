@@ -5,9 +5,13 @@ struct RootView: View {
     @EnvironmentObject private var appState: AppState
     @EnvironmentObject private var locationService: LocationService
 
+    private var requiresSetup: Bool {
+        !appState.hasCompletedSetup || locationService.authorizationStatus != .authorizedAlways
+    }
+
     var body: some View {
         Group {
-            if !appState.hasCompletedSetup || locationService.authorizationStatus != .authorizedAlways {
+            if requiresSetup {
                 SetupView()
             } else {
                 MainTabView()
@@ -17,5 +21,7 @@ struct RootView: View {
 }
 
 #Preview {
-    SetupView()
+    RootView()
+        .environmentObject(AppState())
+        .environmentObject(LocationService.shared)
 }

@@ -5,6 +5,8 @@ struct PlaceManagementView: View {
     @State private var editingPlaceID: UUID?
     @State private var draftName = ""
 
+    // MARK: - UI
+
     var body: some View {
         List {
             if smartPlaceStore.places.isEmpty {
@@ -35,7 +37,7 @@ struct PlaceManagementView: View {
                                     .textFieldStyle(.roundedBorder)
 
                                 Button("Save") {
-                                    SmartPlaceStore.shared.renamePlace(id: place.id, newName: draftName)
+                                    smartPlaceStore.renamePlace(id: place.id, newName: draftName)
                                     editingPlaceID = nil
                                     draftName = ""
                                 }
@@ -55,6 +57,8 @@ struct PlaceManagementView: View {
         }
         .navigationTitle("Smart Places")
     }
+
+    // MARK: - Helpers
 
     private func iconName(for category: SmartPlaceCategory) -> String {
         switch category {

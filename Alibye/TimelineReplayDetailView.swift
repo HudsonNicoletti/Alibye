@@ -6,9 +6,19 @@ struct TimelineReplayDetailView: View {
 
     let date: Date
 
+    // MARK: - UI State
+
     @State private var sliderValue: Double = 0
     @State private var isPlaying = false
     @State private var refreshToken = UUID()
+    @State private var selectedVisit: VisitRecord?
+
+    private enum Constants {
+        static let replayTick: Duration = .milliseconds(28)
+        static let replayStep: Double = 0.12
+    }
+
+    // MARK: - Derived Data
 
     private var allSamples: [LocationSample] {
         historyStore.samples(for: date)
@@ -54,15 +64,18 @@ struct TimelineReplayDetailView: View {
         return idx
     }
 
+    // MARK: - UI
+
     var body: some View {
         ZStack {
             RouteMapView(
                 coordinates: isPlaying || sliderValue > 0 ? displayedCoordinates : fullCoordinates,
-                visitCoordinates: allVisits.map(\.coordinate),
+                visits: allVisits,
                 refreshToken: refreshToken,
                 followUser: false,
                 movingCoordinate: (isPlaying || sliderValue > 0) ? currentMovingCoordinate : nil,
-                heatmapCoordinates: []
+                heatmapCoordinates: [],
+                onVisitTapped: { selectedVisit = $0 }
             )
             .ignoresSafeArea()
 
@@ -78,7 +91,12 @@ struct TimelineReplayDetailView: View {
         .onDisappear {
             stopReplay()
         }
+        .sheet(item: $selectedVisit) { visit in
+            VisitDetailSheet(visit: visit)
+        }
     }
+
+    // MARK: - Overlay
 
     private var bottomOverlay: some View {
         VStack(spacing: 14) {
@@ -171,12 +189,12 @@ struct TimelineReplayDetailView: View {
         }
 
         if let visit = currentVisit {
-            let lowered = visit.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let lowered = normalizedVisitName(visit.title)
             if lowered == "home" {
                 return "At Home"
             } else if lowered == "work" {
                 return "At Work"
-            } else if lowered == "visited place" || lowered == "possible home" || lowered == "possible work" || lowered == "other frequent place" || lowered.isEmpty {
+            } else if isGenericVisitTitle(lowered) {
                 return "Visiting"
             } else {
                 return "At \(visit.title)"
@@ -192,7 +210,7 @@ struct TimelineReplayDetailView: View {
         }
 
         if let visit = currentVisit {
-            let lowered = visit.title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            let lowered = normalizedVisitName(visit.title)
             if lowered == "home" {
                 return .green
             } else if lowered == "work" {
@@ -236,6 +254,8 @@ struct TimelineReplayDetailView: View {
         }
     }
 
+    // MARK: - Replay Controls
+
     private func startReplay() {
         guard !allSamples.isEmpty else { return }
         isPlaying = true
@@ -245,9 +265,9 @@ struct TimelineReplayDetailView: View {
         Task {
             let target = Double(allSamples.count)
             while isPlaying && sliderValue < target {
-                try? await Task.sleep(for: .milliseconds(28))
+                try? await Task.sleep(for: Constants.replayTick)
                 await MainActor.run {
-                    sliderValue = min(sliderValue + 0.12, target)
+                    sliderValue = min(sliderValue + Constants.replayStep, target)
                     refreshToken = UUID()
                 }
             }
@@ -259,5 +279,19 @@ struct TimelineReplayDetailView: View {
 
     private func stopReplay() {
         isPlaying = false
+    }
+
+    // MARK: - Title Helpers
+
+    private func normalizedVisitName(_ title: String) -> String {
+        title.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    private func isGenericVisitTitle(_ normalizedTitle: String) -> Bool {
+        normalizedTitle == "visited place"
+            || normalizedTitle == "possible home"
+            || normalizedTitle == "possible work"
+            || normalizedTitle == "other frequent place"
+            || normalizedTitle.isEmpty
     }
 }

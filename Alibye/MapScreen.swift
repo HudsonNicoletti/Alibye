@@ -4,9 +4,14 @@ import MapKit
 struct MapScreen: View {
     @EnvironmentObject var historyStore: HistoryStore
 
+    // MARK: - UI State
+
     @State private var refreshToken = UUID()
     @State private var showHeatmap = false
     @State private var showSavedLocations = false
+    @State private var selectedVisit: VisitRecord?
+
+    // MARK: - Derived Data
 
     private var samples: [LocationSample] {
         historyStore.samples(for: historyStore.selectedDate)
@@ -16,15 +21,18 @@ struct MapScreen: View {
         historyStore.visits(for: historyStore.selectedDate)
     }
 
+    // MARK: - UI
+
     var body: some View {
         ZStack {
             RouteMapView(
                 coordinates: samples.map(\.coordinate),
-                visitCoordinates: visits.map(\.coordinate),
+                visits: visits,
                 refreshToken: refreshToken,
                 followUser: true,
                 movingCoordinate: nil,
-                heatmapCoordinates: showHeatmap ? visits.map(\.coordinate) : []
+                heatmapCoordinates: showHeatmap ? visits.map(\.coordinate) : [],
+                onVisitTapped: { selectedVisit = $0 }
             )
             .ignoresSafeArea()
 
@@ -72,7 +80,12 @@ struct MapScreen: View {
         .sheet(isPresented: $showSavedLocations) {
             SettingsScreen()
         }
+        .sheet(item: $selectedVisit) { visit in
+            VisitDetailSheet(visit: visit)
+        }
     }
+
+    // MARK: - Helpers
 
     private var bottomOverlay: some View {
         VStack(spacing: 12) {
@@ -90,7 +103,6 @@ struct MapScreen: View {
             }
 
             HStack(spacing: 10) {
-                //summaryPill(title: "Points", value: "\(samples.count)")
                 summaryPill(title: "Visits", value: "\(visits.count)")
                 summaryPill(title: "Route", value: routeDistanceText)
             }
@@ -131,6 +143,7 @@ struct MapScreen: View {
         var total: CLLocationDistance = 0
         let coords = samples.map(\.coordinate)
 
+        // Sum segment distances along the sampled path.
         for index in 1..<coords.count {
             let a = CLLocation(latitude: coords[index - 1].latitude, longitude: coords[index - 1].longitude)
             let b = CLLocation(latitude: coords[index].latitude, longitude: coords[index].longitude)

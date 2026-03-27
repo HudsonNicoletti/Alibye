@@ -9,6 +9,33 @@ struct SetupView: View {
     @State private var isRequesting = false
 
     private let privacyPolicyURL = URL(string: "https://peerpad.net/#/r/markdown/3nvQ4TsNE4jQkSoVwh1LLZz6Fuwf57nCfr3R2kXWAkRU/4XTTM64bfRN4quD9ME8eHib2e7RGJDNyvuPZPDYZB6PuUaNZj")!
+    private var authorizationStatus: CLAuthorizationStatus { locationService.authorizationStatus }
+    private var statusInfo: (title: String, message: String, color: Color)? {
+        switch authorizationStatus {
+        case .authorizedWhenInUse:
+            return (
+                title: "Current access: While Using",
+                message: "Alibye cannot continue until you change this to Always in Settings.",
+                color: .orange
+            )
+        case .denied, .restricted:
+            return (
+                title: "Location access is off",
+                message: "Open Settings and set Location to Always.",
+                color: .red
+            )
+        case .authorizedAlways:
+            return (
+                title: "You're all set",
+                message: "Always access is enabled. Continue to open Alibye.",
+                color: .green
+            )
+        case .notDetermined:
+            return nil
+        @unknown default:
+            return nil
+        }
+    }
 
     var body: some View {
         ZStack {
@@ -27,72 +54,9 @@ struct SetupView: View {
                 Spacer(minLength: 20)
 
                 VStack(spacing: 22) {
-                    ZStack {
-                        Circle()
-                            .fill(.ultraThinMaterial)
-                            .frame(width: 120, height: 120)
-
-                        Image(systemName: "location.circle.fill")
-                            .font(.system(size: 58))
-                            .foregroundStyle(.blue)
-                    }
-
-                    VStack(spacing: 10) {
-                        Text("Location Access Required")
-                            .font(.system(size: 22, weight: .bold, design: .rounded))
-                            .multilineTextAlignment(.center)
-
-                        Text("Alibye needs background location access to build your private timeline and route history.")
-                            .font(.system(size: 14))
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.secondary)
-                            .padding(.horizontal, 10)
-
-                        Text("To continue, set Location Access to Always.")
-                            .font(.system(size: 13, weight: .semibold))
-                            .multilineTextAlignment(.center)
-                            .foregroundStyle(.blue)
-                    }
-
-                    VStack(spacing: 14) {
-                        SetupFeatureRow(
-                            icon: "1.circle.fill",
-                            title: "Open Settings",
-                            subtitle: "We’ll take you to the Alibye settings page."
-                        )
-
-                        SetupFeatureRow(
-                            icon: "2.circle.fill",
-                            title: "Tap Location",
-                            subtitle: "Open the Location permission section."
-                        )
-
-                        SetupFeatureRow(
-                            icon: "3.circle.fill",
-                            title: "Choose Always",
-                            subtitle: "This is required for full tracking to work."
-                        )
-                    }
-
-                    if locationService.authorizationStatus == .authorizedWhenInUse {
-                        statusCard(
-                            title: "Current access: While Using",
-                            message: "Alibye cannot continue until you change this to Always in Settings.",
-                            color: .orange
-                        )
-                    } else if locationService.authorizationStatus == .denied || locationService.authorizationStatus == .restricted {
-                        statusCard(
-                            title: "Location access is off",
-                            message: "Open Settings and set Location to Always.",
-                            color: .red
-                        )
-                    } else if locationService.authorizationStatus == .authorizedAlways {
-                        statusCard(
-                            title: "You're all set",
-                            message: "Always access is enabled. Continue to open Alibye.",
-                            color: .green
-                        )
-                    }
+                    headerSection
+                    stepsSection
+                    statusSection
                 }
                 .padding(24)
                 .background(.ultraThinMaterial)
@@ -103,40 +67,13 @@ struct SetupView: View {
                 Spacer()
 
                 VStack(spacing: 14) {
-                    Button {
-                        primaryAction()
-                    } label: {
-                        HStack {
-                            if isRequesting {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: buttonIcon)
-                            }
-
-                            Text(buttonTitle)
-                                .fontWeight(.semibold)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.blue)
-                    .controlSize(.large)
-                    .padding(.horizontal, 20)
-
-                    Link(destination: privacyPolicyURL) {
-                        Text("Privacy Policy")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                            .underline()
-                    }
-                    .padding(.bottom, 18)
+                    primaryButton
+                    privacyPolicyLink
                 }
             }
         }
         .onAppear {
-            if locationService.authorizationStatus == .authorizedAlways {
+            if authorizationStatus == .authorizedAlways {
                 appState.completeSetup()
             }
         }
@@ -148,8 +85,106 @@ struct SetupView: View {
         }
     }
 
+    // MARK: - Sections
+
+    private var headerSection: some View {
+        VStack(spacing: 22) {
+            ZStack {
+                Circle()
+                    .fill(.ultraThinMaterial)
+                    .frame(width: 120, height: 120)
+
+                Image(systemName: "location.circle.fill")
+                    .font(.system(size: 58))
+                    .foregroundStyle(.blue)
+            }
+
+            VStack(spacing: 10) {
+                Text("Location Access Required")
+                    .font(.system(size: 22, weight: .bold, design: .rounded))
+                    .multilineTextAlignment(.center)
+
+                Text("Alibye needs background location access to build your private timeline and route history.")
+                    .font(.system(size: 14))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 10)
+
+                Text("To continue, set Location Access to Always.")
+                    .font(.system(size: 13, weight: .semibold))
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(.blue)
+            }
+        }
+    }
+
+    private var stepsSection: some View {
+        VStack(spacing: 14) {
+            SetupFeatureRow(
+                icon: "1.circle.fill",
+                title: "Open Settings",
+                subtitle: "We’ll take you to the Alibye settings page."
+            )
+
+            SetupFeatureRow(
+                icon: "2.circle.fill",
+                title: "Tap Location",
+                subtitle: "Open the Location permission section."
+            )
+
+            SetupFeatureRow(
+                icon: "3.circle.fill",
+                title: "Choose Always",
+                subtitle: "This is required for full tracking to work."
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var statusSection: some View {
+        if let statusInfo {
+            statusCard(title: statusInfo.title, message: statusInfo.message, color: statusInfo.color)
+        }
+    }
+
+    private var primaryButton: some View {
+        Button {
+            primaryAction()
+        } label: {
+            HStack {
+                if isRequesting {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Image(systemName: buttonIcon)
+                }
+
+                Text(buttonTitle)
+                    .fontWeight(.semibold)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 16)
+        }
+        .buttonStyle(.borderedProminent)
+        .tint(.blue)
+        .controlSize(.large)
+        .padding(.horizontal, 20)
+    }
+
+    private var privacyPolicyLink: some View {
+        Link(destination: privacyPolicyURL) {
+            Text("Privacy Policy")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .underline()
+        }
+        .padding(.bottom, 18)
+    }
+
+    // MARK: - Button Content
+
     private var buttonTitle: String {
-        switch locationService.authorizationStatus {
+        switch authorizationStatus {
         case .authorizedAlways:
             return "Continue"
         case .notDetermined:
@@ -162,7 +197,7 @@ struct SetupView: View {
     }
 
     private var buttonIcon: String {
-        switch locationService.authorizationStatus {
+        switch authorizationStatus {
         case .authorizedAlways:
             return "checkmark.circle.fill"
         case .notDetermined:
@@ -175,7 +210,9 @@ struct SetupView: View {
     }
 
     private func primaryAction() {
-        switch locationService.authorizationStatus {
+        // Route the CTA based on current permission state:
+        // request once, then bounce the user to Settings for manual changes.
+        switch authorizationStatus {
         case .authorizedAlways:
             appState.completeSetup()
 
@@ -242,4 +279,8 @@ private struct SetupFeatureRow: View {
     }
 }
 
-
+#Preview {
+    SetupView()
+        .environmentObject(AppState())
+        .environmentObject(LocationService.shared)
+}
